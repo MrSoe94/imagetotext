@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TableScan Pro - Offline OCR Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Tesseract.js untuk OCR sisi klien -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .editable-cell:focus {
+            background-color: #eff6ff;
+            outline: none;
+            box-shadow: inset 0 0 0 2px #3b82f6;
+        }
+        
+        .loading-shimmer {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+                    <i class="fas fa-table-cells text-white text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-extrabold text-slate-900">TableScan <span class="text-blue-600">Pro</span></h1>
+                    <p class="text-slate-500 text-sm font-medium">Pemindai Gambar ke Tabel - 100% Offline</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <input type="file" id="imageInput" accept="image/*" class="hidden">
+                <button onclick="document.getElementById('imageInput').click()" class="bg-white border border-slate-200 hover:border-blue-500 hover:text-blue-600 transition-all px-5 py-2.5 rounded-lg font-semibold shadow-sm flex items-center gap-2">
+                    <i class="fas fa-file-image"></i>
+                    Pilih Gambar
+                </button>
+                <button id="extractBtn" disabled class="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:shadow-none text-white px-6 py-2.5 rounded-lg font-semibold shadow-md shadow-blue-100 transition-all flex items-center gap-2">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    Ekstrak Tabel
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Sidebar: Preview -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Pratinjau</h3>
+                    <div id="dropZone" class="relative group aspect-square bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center overflow-hidden transition-all hover:border-blue-400">
+                        <div id="uploadPlaceholder" class="text-center p-6">
+                            <i class="fas fa-cloud-arrow-up text-3xl text-slate-300 mb-3"></i>
+                            <p class="text-sm font-medium text-slate-500">Klik untuk unggah</p>
+                        </div>
+                        <img id="previewImage" class="hidden w-full h-full object-contain">
+                    </div>
+
+                    <!-- Progress Loader -->
+                    <div id="loaderContainer" class="mt-6 hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <span id="loaderStatus" class="text-xs font-bold text-blue-600 uppercase">Memproses...</span>
+                            <span id="loaderPercent" class="text-xs font-bold text-blue-600">0%</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div id="loaderBar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Card -->
+                <div class="bg-blue-50 border border-blue-100 p-5 rounded-2xl">
+                    <div class="flex gap-4">
+                        <i class="fas fa-shield-halved text-blue-600 text-lg mt-1"></i>
+                        <div>
+                            <h4 class="text-sm font-bold text-blue-900">Privasi Lokal</h4>
+                            <p class="text-xs text-blue-700 leading-relaxed mt-1">Proses OCR dilakukan di memori komputer Anda. Tidak ada data yang dikirim ke internet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main: Table Editor -->
+            <div class="lg:col-span-8">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full min-h-[500px]">
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Editor Data</h3>
+                            <span id="rowTag" class="hidden px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded">0 BARIS</span>
+                        </div>
+                        <div id="tableActions" class="hidden flex gap-2">
+                            <button onclick="copyToClipboard()" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Salin ke Clipboard">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            <button onclick="downloadCSV()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center gap-2">
+                                <i class="fas fa-file-csv"></i>
+                                Simpan CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="tableArea" class="flex-1 overflow-auto custom-scrollbar p-1">
+                        <!-- Empty State -->
+                        <div id="emptyState" class="h-full flex flex-col items-center justify-center text-center p-12">
+                            <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4">
+                                <i class="fas fa-table-list text-2xl text-slate-200"></i>
+                            </div>
+                            <p class="text-slate-400 text-sm">Pilih gambar tabel untuk mulai mengekstrak data.</p>
+                        </div>
+
+                        <!-- Table Container -->
+                        <div id="tableContent" class="hidden p-4">
+                            <div class="border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                <table class="w-full border-collapse">
+                                    <tbody id="tableBody" class="divide-y divide-slate-100">
+                                        <!-- Rows injected by JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="tableFooter" class="px-5 py-3 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 flex justify-between hidden">
+                        <span>Akurasi bergantung pada kejernihan gambar.</span>
+                        <span>Double-click sel untuk mengedit.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const previewImage = document.getElementById('previewImage');
+        const uploadPlaceholder = document.getElementById('uploadPlaceholder');
+        const extractBtn = document.getElementById('extractBtn');
+        const loaderContainer = document.getElementById('loaderContainer');
+        const loaderBar = document.getElementById('loaderBar');
+        const loaderPercent = document.getElementById('loaderPercent');
+        const loaderStatus = document.getElementById('loaderStatus');
+        const tableBody = document.getElementById('tableBody');
+        const emptyState = document.getElementById('emptyState');
+        const tableContent = document.getElementById('tableContent');
+        const tableActions = document.getElementById('tableActions');
+        const rowTag = document.getElementById('rowTag');
+        const tableFooter = document.getElementById('tableFooter');
+
+        let imageData = null;
+
+        // Handle Image Selection
+        imageInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imageData = event.target.result;
+                previewImage.src = imageData;
+                previewImage.classList.remove('hidden');
+                uploadPlaceholder.classList.add('hidden');
+                extractBtn.disabled = false;
+                
+                // Reset View
+                tableContent.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                tableActions.classList.add('hidden');
+                tableFooter.classList.add('hidden');
+                rowTag.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        };
+
+        // Extraction Logic
+        extractBtn.onclick = async function() {
+            if (!imageData) return;
+
+            extractBtn.disabled = true;
+            loaderContainer.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+
+            try {
+                // Initialize Worker (Support for Indo and English)
+                const worker = await Tesseract.createWorker(['ind', 'eng'], 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const p = Math.floor(m.progress * 100);
+                            loaderBar.style.width = p + '%';
+                            loaderPercent.innerText = p + '%';
+                            loaderStatus.innerText = 'Membaca Baris...';
+                        } else {
+                            loaderStatus.innerText = 'Inisialisasi...';
+                        }
+                    }
+                });
+
+                const { data } = await worker.recognize(imageData);
+                await worker.terminate();
+
+                processOCRResults(data);
+            } catch (err) {
+                console.error(err);
+                alert("Gagal memproses gambar. Pastikan gambar terbaca dengan jelas.");
+                emptyState.classList.remove('hidden');
+            } finally {
+                extractBtn.disabled = false;
+                loaderContainer.classList.add('hidden');
+            }
+        };
+
+        // Algorithm to structure data into table
+        function processOCRResults(data) {
+            const lines = {};
+            const Y_PRECISION = 20; // Tolerance for grouping words into same row
+
+            data.words.forEach(word => {
+                const y = Math.round(word.bbox.y0 / Y_PRECISION) * Y_PRECISION;
+                if (!lines[y]) lines[y] = [];
+                lines[y].push(word);
+            });
+
+            const sortedY = Object.keys(lines).sort((a, b) => a - b);
+            tableBody.innerHTML = '';
+            let rowCount = 0;
+
+            sortedY.forEach(y => {
+                const words = lines[y].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+                const cells = [];
+                let currentCellText = [];
+                
+                words.forEach((w, i) => {
+                    if (i > 0) {
+                        const gap = w.bbox.x0 - words[i-1].bbox.x1;
+                        // If gap between words is large enough, treat as new column
+                        if (gap > 45) {
+                            cells.push(currentCellText.join(' '));
+                            currentCellText = [];
+                        }
+                    }
+                    currentCellText.push(w.text);
+                });
+                cells.push(currentCellText.join(' '));
+
+                if (cells.join('').trim().length > 0) {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50 transition-colors";
+                    
+                    cells.forEach(text => {
+                        const td = document.createElement('td');
+                        td.className = "border-r border-slate-100 p-0 min-w-[140px]";
+                        td.innerHTML = `
+                            <input type="text" 
+                                   value="${text.trim()}" 
+                                   class="editable-cell w-full h-full p-3.5 text-sm text-slate-600 bg-transparent border-none transition-all">
+                        `;
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                    rowCount++;
+                }
+            });
+
+            if (rowCount > 0) {
+                tableContent.classList.remove('hidden');
+                tableActions.classList.remove('hidden');
+                tableFooter.classList.remove('hidden');
+                rowTag.classList.remove('hidden');
+                rowTag.innerText = `${rowCount} BARIS`;
+            } else {
+                emptyState.classList.remove('hidden');
+                alert("Teks tabel tidak terdeteksi. Coba gambar lain.");
+            }
+        }
+
+        // Action: Copy to Excel format (Tab Separated)
+        function copyToClipboard() {
+            const rows = Array.from(tableBody.querySelectorAll('tr'));
+            const text = rows.map(tr => {
+                return Array.from(tr.querySelectorAll('input')).map(i => i.value).join('\t');
+            }).join('\n');
+
+            const hiddenInput = document.createElement('textarea');
+            hiddenInput.value = text;
+            document.body.appendChild(hiddenInput);
+            hiddenInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(hiddenInput);
+            
+            alert("Berhasil disalin! Anda bisa menempelkannya (paste) di Excel atau Google Sheets.");
+        }
+
+        // Action: Download CSV
+        function downloadCSV() {
+            const rows = Array.from(tableBody.querySelectorAll('tr'));
+            const csvData = rows.map(tr => {
+                return Array.from(tr.querySelectorAll('input'))
+                            .map(i => `"${i.value.replace(/"/g, '""')}"`)
+                            .join(',');
+            }).join('\n');
+
+            const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', 'hasil_scan_tabel.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Drag & Drop Functionality
+        const dropZone = document.getElementById('dropZone');
+        ['dragover', 'dragenter'].forEach(eName => {
+            dropZone.addEventListener(eName, e => {
+                e.preventDefault();
+                dropZone.classList.add('border-blue-400', 'bg-blue-50');
+            });
+        });
+        ['dragleave', 'drop'].forEach(eName => {
+            dropZone.addEventListener(eName, e => {
+                e.preventDefault();
+                dropZone.classList.remove('border-blue-400', 'bg-blue-50');
+            });
+        });
+        dropZone.addEventListener('drop', e => {
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                imageInput.onchange({ target: { files: e.dataTransfer.files } });
+            }
+        });
+    </script>
+</body>
+</html>
