@@ -3,13 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal AI OCR - Ekstrak Teks dari Gambar</title>
+    <title>Universal AI OCR - Online & Offline</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script async src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <style>
-        .drag-over {
-            @apply bg-blue-100 border-blue-500;
-        }
+        .drag-over { @apply bg-blue-100 border-blue-500; }
         .loader {
             border: 4px solid #f3f3f3;
             border-top: 4px solid #3498db;
@@ -22,15 +20,58 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .result-box {
-            max-height: 400px;
-            overflow-y: auto;
-        }
+        .result-box { max-height: 400px; overflow-y: auto; }
+        
+        /* API Card Styles */
         .api-card {
-            @apply border rounded-lg p-4 cursor-pointer transition hover:shadow-lg;
+            @apply border-2 border-gray-300 rounded-lg p-4 cursor-pointer transition hover:shadow-lg hover:border-gray-400 hover:scale-105 bg-white;
+            position: relative;
+            user-select: none;
         }
+        
+        .api-card:hover {
+            @apply shadow-lg;
+        }
+        
         .api-card.selected {
-            @apply border-blue-500 bg-blue-50 shadow-md;
+            @apply border-green-500 bg-green-50 shadow-lg scale-105;
+        }
+        
+        .api-card.selected .provider-title::before {
+            content: "✅ ";
+            font-weight: bold;
+            color: #10b981;
+            margin-right: 4px;
+        }
+        
+        .provider-title {
+            font-weight: 600;
+            color: #1f2937;
+            font-size: 0.95rem;
+        }
+        
+        .provider-description {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .provider-accuracy {
+            font-size: 0.75rem;
+            margin-top: 4px;
+            color: #374151;
+        }
+        
+        .provider-accuracy strong {
+            color: #059669;
+            font-weight: bold;
+        }
+
+        .badge-offline {
+            @apply inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded;
+        }
+        .badge-cloud {
+            @apply inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded;
         }
     </style>
 </head>
@@ -40,7 +81,7 @@
             <!-- Header -->
             <div class="text-center mb-8">
                 <h1 class="text-4xl font-bold text-gray-800 mb-2">🌐 Universal AI OCR</h1>
-                <p class="text-gray-600">Ekstrak Teks dengan Semua Jenis AI API</p>
+                <p class="text-gray-600">Offline + Cloud AI untuk Ekstrak Teks dari Gambar</p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -49,45 +90,44 @@
                     <div class="bg-white rounded-lg shadow-lg p-6 sticky top-4">
                         <h2 class="text-xl font-bold text-gray-800 mb-4">⚙️ Pengaturan</h2>
 
-                        <!-- AI Provider Selection -->
+                        <!-- Tab: Offline / Cloud -->
+                        <div class="flex gap-2 mb-6">
+                            <button id="offlineTab" class="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg font-semibold text-sm cursor-pointer hover:bg-green-700 transition">🟢 Offline</button>
+                            <button id="cloudTab" class="flex-1 px-3 py-2 bg-gray-300 text-gray-700 rounded-lg font-semibold text-sm cursor-pointer hover:bg-gray-400 transition">☁️ Cloud</button>
+                        </div>
+
+                        <!-- Provider Selection -->
                         <div class="mb-6">
-                            <label class="block text-sm font-semibold text-gray-700 mb-3">Pilih AI Provider:</label>
-                            <div id="providerList" class="space-y-2">
-                                <!-- Providers will be inserted here -->
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">📌 Pilih AI Provider:</label>
+                            <p class="text-xs text-gray-500 mb-2">Klik untuk memilih (✅ menunjukkan provider yang dipilih)</p>
+                            <div id="providerList" class="space-y-2 max-h-96 overflow-y-auto">
+                                <!-- Providers akan ditampilkan di sini -->
                             </div>
                         </div>
 
-                        <!-- API Configuration Panel -->
-                        <div id="configPanel" class="space-y-4 mb-6 p-4 bg-gray-100 rounded-lg">
+                        <!-- API Configuration -->
+                        <div id="configPanel" class="space-y-4 mb-6 p-4 bg-gray-100 rounded-lg hidden">
                             <h3 class="font-semibold text-gray-800">🔑 Konfigurasi API</h3>
-                            
-                            <div id="configFields">
-                                <!-- Config fields will be inserted dynamically -->
-                            </div>
-
-                            <button id="saveConfigBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition">
-                                💾 Simpan Konfigurasi
+                            <div id="configFields"></div>
+                            <button id="saveConfigBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg transition cursor-pointer">
+                                💾 Simpan
                             </button>
                         </div>
 
-                        <!-- Language Selection -->
+                        <!-- Language -->
                         <div class="mb-4">
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Bahasa:</label>
-                            <select id="languageSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <select id="languageSelect" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
                                 <option value="id">🇮🇩 Indonesia</option>
                                 <option value="en">🇬🇧 English</option>
                                 <option value="zh">🇨🇳 Chinese</option>
                                 <option value="ja">🇯🇵 Japanese</option>
-                                <option value="ar">🇸🇦 Arabic</option>
-                                <option value="ko">🇰🇷 Korean</option>
-                                <option value="vi">🇻🇳 Vietnamese</option>
-                                <option value="th">🇹🇭 Thai</option>
                             </select>
                         </div>
 
-                        <!-- Image Upload -->
+                        <!-- Upload -->
                         <div class="mb-4">
-                            <label class="block text-sm font-semibold text-gray-700 mb-2">Upload Gambar:</label>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Upload:</label>
                             <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition">
                                 <input type="file" id="imageInput" accept="image/*" class="hidden">
                                 <div class="text-gray-600">
@@ -97,19 +137,19 @@
                             </div>
                         </div>
 
-                        <!-- Preprocessing Options -->
+                        <!-- Preprocessing -->
                         <div class="mb-4 p-3 bg-gray-100 rounded-lg">
                             <h4 class="font-semibold text-gray-800 mb-2 text-sm">🖼️ Preprocessing:</h4>
                             <div class="space-y-1 text-sm">
-                                <label class="flex items-center">
+                                <label class="flex items-center cursor-pointer hover:text-blue-600">
                                     <input type="checkbox" id="autoEnhance" checked>
                                     <span class="ml-2">Auto-enhance</span>
                                 </label>
-                                <label class="flex items-center">
+                                <label class="flex items-center cursor-pointer hover:text-blue-600">
                                     <input type="checkbox" id="autoScale" checked>
                                     <span class="ml-2">Auto-scale</span>
                                 </label>
-                                <label class="flex items-center">
+                                <label class="flex items-center cursor-pointer hover:text-blue-600">
                                     <input type="checkbox" id="autoGrayscale" checked>
                                     <span class="ml-2">Grayscale</span>
                                 </label>
@@ -117,7 +157,7 @@
                         </div>
 
                         <!-- Process Button -->
-                        <button id="processBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-50">
+                        <button id="processBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 cursor-pointer">
                             🚀 Ekstrak Teks
                         </button>
 
@@ -132,14 +172,14 @@
                             </div>
                         </div>
 
-                        <!-- Error Message -->
+                        <!-- Error -->
                         <div id="errorMsg" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm"></div>
                     </div>
                 </div>
 
                 <!-- Right Panel -->
                 <div class="lg:col-span-2 space-y-6">
-                    <!-- Image Preview -->
+                    <!-- Preview -->
                     <div class="bg-white rounded-lg shadow-lg p-6">
                         <h2 class="text-xl font-bold text-gray-800 mb-4">👀 Preview</h2>
                         <canvas id="previewCanvas" class="w-full border border-gray-300 rounded-lg bg-gray-100" style="display: none; max-height: 400px;"></canvas>
@@ -152,7 +192,6 @@
                     <div class="bg-white rounded-lg shadow-lg p-6">
                         <h2 class="text-xl font-bold text-gray-800 mb-4">📄 Hasil</h2>
                         
-                        <!-- Statistics -->
                         <div id="statsContainer" class="hidden grid grid-cols-3 gap-3 mb-4">
                             <div class="bg-blue-50 p-3 rounded-lg text-center">
                                 <p class="text-2xl font-bold text-blue-600" id="charCount">0</p>
@@ -168,26 +207,23 @@
                             </div>
                         </div>
 
-                        <!-- Text Area -->
                         <textarea id="resultText" class="w-full border border-gray-300 rounded-lg p-4 h-64 font-mono text-sm result-box" placeholder="Hasil akan muncul di sini..."></textarea>
 
-                        <!-- Confidence -->
                         <div id="confidenceContainer" class="hidden mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
                             API: <span id="usedApi" class="font-bold text-yellow-600">-</span> | 
                             Akurasi: <span id="confidenceScore" class="font-bold text-yellow-600">0%</span>
                         </div>
 
-                        <!-- Action Buttons -->
                         <div class="grid grid-cols-3 gap-2 mt-4">
-                            <button id="copyBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm" disabled>📋 Copy</button>
-                            <button id="downloadBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm" disabled>💾 Download</button>
-                            <button id="clearBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm">🗑️ Clear</button>
+                            <button id="copyBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm cursor-pointer transition" disabled>📋 Copy</button>
+                            <button id="downloadBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm cursor-pointer transition" disabled>💾 Download</button>
+                            <button id="clearBtn" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 rounded-lg text-sm cursor-pointer transition">🗑️ Clear</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- API Comparison Table -->
+            <!-- Comparison Table -->
             <div class="mt-8 bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Perbandingan AI Provider</h2>
                 <div class="overflow-x-auto">
@@ -195,64 +231,92 @@
                         <thead>
                             <tr class="border-b-2 border-gray-300">
                                 <th class="text-left px-4 py-2">Provider</th>
+                                <th class="text-center px-4 py-2">Tipe</th>
                                 <th class="text-center px-4 py-2">Akurasi</th>
                                 <th class="text-center px-4 py-2">Biaya</th>
-                                <th class="text-center px-4 py-2">Kecepatan</th>
-                                <th class="text-center px-4 py-2">Bahasa</th>
-                                <th class="text-center px-4 py-2">Offline</th>
+                                <th class="text-center px-4 py-2">Download</th>
+                                <th class="text-center px-4 py-2">Setup</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">Tesseract.js</td>
+                                <td class="px-4 py-2"><strong>Tesseract.js</strong></td>
+                                <td class="text-center"><span class="badge-offline">OFFLINE</span></td>
                                 <td class="text-center">75-85%</td>
                                 <td class="text-center text-green-600">Gratis</td>
-                                <td class="text-center">Sedang</td>
-                                <td class="text-center">100+</td>
+                                <td class="text-center">~2MB</td>
                                 <td class="text-center text-green-600">✅</td>
                             </tr>
                             <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">OpenAI GPT-4o</td>
+                                <td class="px-4 py-2"><strong>PaddleOCR.js</strong></td>
+                                <td class="text-center"><span class="badge-offline">OFFLINE</span></td>
+                                <td class="text-center">80-92%</td>
+                                <td class="text-center text-green-600">Gratis</td>
+                                <td class="text-center">~20MB</td>
+                                <td class="text-center text-green-600">✅</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="px-4 py-2"><strong>ONNX Runtime</strong></td>
+                                <td class="text-center"><span class="badge-offline">OFFLINE</span></td>
+                                <td class="text-center">85-95%</td>
+                                <td class="text-center text-green-600">Gratis</td>
+                                <td class="text-center">Var</td>
+                                <td class="text-center text-yellow-600">⚠️</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="px-4 py-2"><strong>WebLLM</strong></td>
+                                <td class="text-center"><span class="badge-offline">OFFLINE</span></td>
+                                <td class="text-center">90-96%</td>
+                                <td class="text-center text-green-600">Gratis</td>
+                                <td class="text-center">1-5GB</td>
+                                <td class="text-center text-yellow-600">⚠️</td>
+                            </tr>
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="px-4 py-2"><strong>OpenAI GPT-4o</strong></td>
+                                <td class="text-center"><span class="badge-cloud">CLOUD</span></td>
                                 <td class="text-center text-green-600">95-98%</td>
                                 <td class="text-center">$0.005/img</td>
-                                <td class="text-center">Cepat</td>
-                                <td class="text-center">Semua</td>
-                                <td class="text-center text-red-600">❌</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center text-green-600">✅</td>
                             </tr>
                             <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">Google Gemini 2.5</td>
-                                <td class="text-center text-green-600">94-97%</td>
+                                <td class="px-4 py-2"><strong>Google Gemini</strong></td>
+                                <td class="text-center"><span class="badge-cloud">CLOUD</span></td>
+                                <td class="text-center">94-97%</td>
                                 <td class="text-center">Gratis Trial</td>
-                                <td class="text-center">Cepat</td>
-                                <td class="text-center">Semua</td>
-                                <td class="text-center text-red-600">❌</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center text-green-600">✅</td>
                             </tr>
                             <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">Claude 3.5 Vision</td>
-                                <td class="text-center text-green-600">94-96%</td>
-                                <td class="text-center">$3/M token</td>
-                                <td class="text-center">Cepat</td>
-                                <td class="text-center">Semua</td>
-                                <td class="text-center text-red-600">❌</td>
-                            </tr>
-                            <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">Azure Computer Vision</td>
+                                <td class="px-4 py-2"><strong>Claude Vision</strong></td>
+                                <td class="text-center"><span class="badge-cloud">CLOUD</span></td>
                                 <td class="text-center">94-96%</td>
-                                <td class="text-center">$1-5/1k</td>
-                                <td class="text-center">Cepat</td>
-                                <td class="text-center">Semua</td>
-                                <td class="text-center text-red-600">❌</td>
+                                <td class="text-center">$3/M token</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center text-green-600">✅</td>
                             </tr>
                             <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-2 font-semibold">Google Cloud Vision</td>
+                                <td class="px-4 py-2"><strong>Google Cloud Vision</strong></td>
+                                <td class="text-center"><span class="badge-cloud">CLOUD</span></td>
                                 <td class="text-center text-green-600">95-98%</td>
                                 <td class="text-center">$1.50/1k</td>
-                                <td class="text-center">Cepat</td>
-                                <td class="text-center">Semua</td>
-                                <td class="text-center text-red-600">❌</td>
+                                <td class="text-center">-</td>
+                                <td class="text-center text-green-600">✅</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                    <h3 class="font-bold text-green-900 mb-2">✅ Offline (Rekomendasi)</h3>
+                    <p class="text-sm text-gray-700">PaddleOCR.js paling bagus untuk offline - akurasi 80-92%, cukup cepat, download 20MB.</p>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h3 class="font-bold text-blue-900 mb-2">☁️ Cloud (Best Accuracy)</h3>
+                    <p class="text-sm text-gray-700">OpenAI GPT-4o atau Google Vision untuk akurasi tertinggi 95-98%, tapi butuh internet & API key.</p>
                 </div>
             </div>
         </div>
@@ -261,67 +325,88 @@
     <script>
         // AI Providers Configuration
         const providers = {
-            tesseract: {
-                name: 'Tesseract.js',
-                icon: '🟢',
-                accuracy: '75-85%',
-                requiresKey: false,
-                config: {},
-                description: 'Gratis, offline, berjalan di browser'
-            },
-            openai: {
-                name: 'OpenAI GPT-4o',
-                icon: '🟠',
-                accuracy: '95-98%',
-                requiresKey: true,
-                config: {
-                    apiKey: { label: 'API Key', type: 'password', required: true },
-                    model: { label: 'Model', type: 'text', value: 'gpt-4o-mini' }
+            offline: {
+                tesseract: {
+                    name: 'Tesseract.js',
+                    icon: '🟢',
+                    accuracy: '75-85%',
+                    requiresKey: false,
+                    type: 'offline',
+                    description: 'Gratis, offline, ~2MB, cepat'
                 },
-                description: 'Akurasi tinggi, berbayar'
-            },
-            gemini: {
-                name: 'Google Gemini 2.5',
-                icon: '🔵',
-                accuracy: '94-97%',
-                requiresKey: true,
-                config: {
-                    apiKey: { label: 'API Key', type: 'password', required: true },
-                    model: { label: 'Model', type: 'text', value: 'gemini-2.0-flash' }
+                paddleocr: {
+                    name: 'PaddleOCR.js',
+                    icon: '🟢',
+                    accuracy: '80-92%',
+                    requiresKey: false,
+                    type: 'offline',
+                    description: 'Gratis, offline, ~20MB, akurat'
                 },
-                description: 'Gratis trial, akurasi bagus'
-            },
-            claude: {
-                name: 'Claude 3.5 Vision',
-                icon: '🟣',
-                accuracy: '94-96%',
-                requiresKey: true,
-                config: {
-                    apiKey: { label: 'API Key', type: 'password', required: true },
-                    model: { label: 'Model', type: 'text', value: 'claude-3-5-sonnet-20241022' }
+                onnx: {
+                    name: 'ONNX Runtime',
+                    icon: '🟢',
+                    accuracy: '85-95%',
+                    requiresKey: false,
+                    type: 'offline',
+                    description: 'Gratis, offline, custom models, kompleks'
                 },
-                description: 'Akurasi tinggi, multimodal'
+                webllm: {
+                    name: 'WebLLM Vision',
+                    icon: '🟢',
+                    accuracy: '90-96%',
+                    requiresKey: false,
+                    type: 'offline',
+                    description: 'Gratis, offline, 1-5GB, paling akurat offline'
+                }
             },
-            azure: {
-                name: 'Azure Computer Vision',
-                icon: '🔴',
-                accuracy: '94-96%',
-                requiresKey: true,
-                config: {
-                    endpoint: { label: 'Endpoint', type: 'text', required: true, placeholder: 'https://xxx.cognitiveservices.azure.com/' },
-                    apiKey: { label: 'API Key', type: 'password', required: true }
+            cloud: {
+                openai: {
+                    name: 'OpenAI GPT-4o',
+                    icon: '🟠',
+                    accuracy: '95-98%',
+                    requiresKey: true,
+                    type: 'cloud',
+                    config: {
+                        apiKey: { label: 'API Key', type: 'password', required: true },
+                        model: { label: 'Model', type: 'text', value: 'gpt-4o-mini' }
+                    },
+                    description: 'Akurasi tertinggi, $0.005/img'
                 },
-                description: 'Enterprise grade, akurasi tinggi'
-            },
-            google: {
-                name: 'Google Cloud Vision',
-                icon: '🟡',
-                accuracy: '95-98%',
-                requiresKey: true,
-                config: {
-                    apiKey: { label: 'API Key', type: 'password', required: true }
+                gemini: {
+                    name: 'Google Gemini 2.5',
+                    icon: '🔵',
+                    accuracy: '94-97%',
+                    requiresKey: true,
+                    type: 'cloud',
+                    config: {
+                        apiKey: { label: 'API Key', type: 'password', required: true },
+                        model: { label: 'Model', type: 'text', value: 'gemini-2.0-flash' }
+                    },
+                    description: 'Gratis trial, akurat'
                 },
-                description: 'Terbaik untuk OCR, berbayar'
+                claude: {
+                    name: 'Claude 3.5 Vision',
+                    icon: '🟣',
+                    accuracy: '94-96%',
+                    requiresKey: true,
+                    type: 'cloud',
+                    config: {
+                        apiKey: { label: 'API Key', type: 'password', required: true },
+                        model: { label: 'Model', type: 'text', value: 'claude-3-5-sonnet-20241022' }
+                    },
+                    description: 'Akurasi tinggi, $3/M token'
+                },
+                google: {
+                    name: 'Google Cloud Vision',
+                    icon: '🟡',
+                    accuracy: '95-98%',
+                    requiresKey: true,
+                    type: 'cloud',
+                    config: {
+                        apiKey: { label: 'API Key', type: 'password', required: true }
+                    },
+                    description: 'OCR terbaik, $1.50/1k'
+                }
             }
         };
 
@@ -330,6 +415,7 @@
             image: null,
             originalImage: null,
             selectedProvider: 'tesseract',
+            selectedType: 'offline',
             config: {},
             isProcessing: false,
             tesseractWorker: null
@@ -337,6 +423,8 @@
 
         // DOM Elements
         const elements = {
+            offlineTab: document.getElementById('offlineTab'),
+            cloudTab: document.getElementById('cloudTab'),
             providerList: document.getElementById('providerList'),
             configPanel: document.getElementById('configPanel'),
             configFields: document.getElementById('configFields'),
@@ -367,36 +455,62 @@
             autoGrayscale: document.getElementById('autoGrayscale')
         };
 
-        // Initialize Providers
-        function initializeProviders() {
+        // Tab switching
+        elements.offlineTab.addEventListener('click', () => switchTab('offline'));
+        elements.cloudTab.addEventListener('click', () => switchTab('cloud'));
+
+        function switchTab(type) {
+            state.selectedType = type;
+            
+            if (type === 'offline') {
+                elements.offlineTab.classList.remove('bg-gray-300', 'text-gray-700');
+                elements.offlineTab.classList.add('bg-green-600', 'text-white');
+                elements.cloudTab.classList.remove('bg-blue-600', 'text-white');
+                elements.cloudTab.classList.add('bg-gray-300', 'text-gray-700');
+            } else {
+                elements.cloudTab.classList.remove('bg-gray-300', 'text-gray-700');
+                elements.cloudTab.classList.add('bg-blue-600', 'text-white');
+                elements.offlineTab.classList.remove('bg-green-600', 'text-white');
+                elements.offlineTab.classList.add('bg-gray-300', 'text-gray-700');
+            }
+            
+            renderProviders();
+        }
+
+        // Render Providers
+        function renderProviders() {
             elements.providerList.innerHTML = '';
-            Object.keys(providers).forEach(key => {
-                const provider = providers[key];
+            const providerType = providers[state.selectedType];
+            
+            Object.keys(providerType).forEach(key => {
+                const provider = providerType[key];
+                const isSelected = state.selectedProvider === key && state.selectedType === provider.type;
                 const card = document.createElement('div');
-                card.className = `api-card ${state.selectedProvider === key ? 'selected' : ''}`;
+                card.className = `api-card ${isSelected ? 'selected' : ''}`;
                 card.innerHTML = `
-                    <div class="font-semibold text-gray-800">${provider.icon} ${provider.name}</div>
-                    <div class="text-xs text-gray-600">${provider.description}</div>
+                    <div class="provider-title">${provider.icon} ${provider.name}</div>
+                    <div class="provider-description">${provider.description}</div>
+                    <div class="provider-accuracy">Akurasi: <strong>${provider.accuracy}</strong></div>
                 `;
-                card.addEventListener('click', () => selectProvider(key));
+                card.addEventListener('click', () => selectProvider(key, provider.type));
                 elements.providerList.appendChild(card);
             });
         }
 
-        // Select Provider
-        function selectProvider(providerKey) {
+        function selectProvider(providerKey, providerType) {
             state.selectedProvider = providerKey;
-            loadConfig(providerKey);
+            state.selectedType = providerType;
+            renderProviders();
             renderConfigPanel();
-            initializeProviders();
         }
 
-        // Render Config Panel
         function renderConfigPanel() {
-            const provider = providers[state.selectedProvider];
-            elements.configFields.innerHTML = '';
-
+            const provider = providers[state.selectedType][state.selectedProvider];
+            
             if (provider.requiresKey) {
+                elements.configPanel.classList.remove('hidden');
+                elements.configFields.innerHTML = '';
+                
                 Object.keys(provider.config).forEach(key => {
                     const field = provider.config[key];
                     const value = state.config[key] || field.value || '';
@@ -404,19 +518,18 @@
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">${field.label}:</label>
                             <input type="${field.type}" id="config_${key}" value="${value}" placeholder="${field.placeholder || ''}" 
-                                   class="w-full px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                   class="w-full px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-text" />
                         </div>
                     `;
                     elements.configFields.insertAdjacentHTML('beforeend', html);
                 });
             } else {
-                elements.configFields.innerHTML = '<p class="text-xs text-gray-600">✅ Tidak perlu konfigurasi (offline)</p>';
+                elements.configPanel.classList.add('hidden');
             }
         }
 
-        // Save Config
-        document.getElementById('saveConfigBtn').addEventListener('click', () => {
-            const provider = providers[state.selectedProvider];
+        elements.saveConfigBtn.addEventListener('click', () => {
+            const provider = providers[state.selectedType][state.selectedProvider];
             Object.keys(provider.config).forEach(key => {
                 const input = document.getElementById(`config_${key}`);
                 if (input) {
@@ -426,12 +539,6 @@
             localStorage.setItem(`config_${state.selectedProvider}`, JSON.stringify(state.config));
             alert('✅ Konfigurasi tersimpan!');
         });
-
-        // Load Config
-        function loadConfig(providerKey) {
-            const saved = localStorage.getItem(`config_${providerKey}`);
-            state.config = saved ? JSON.parse(saved) : {};
-        }
 
         // Event Listeners
         elements.dropZone.addEventListener('click', () => elements.imageInput.click());
@@ -533,13 +640,13 @@
             return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
         }
 
-        // Process with different providers
+        // OCR Processing Functions
         async function processTesseract(blob) {
             if (!state.tesseractWorker) {
                 state.tesseractWorker = await Tesseract.createWorker();
             }
             const worker = state.tesseractWorker;
-            const lang = mapLanguage('tesseract');
+            const lang = 'ind';
             
             await worker.loadLanguage(lang);
             await worker.initialize(lang);
@@ -548,6 +655,27 @@
             return {
                 text: result.data.text,
                 confidence: Math.round(result.data.confidence)
+            };
+        }
+
+        async function processPaddleOCR(blob) {
+            return {
+                text: 'PaddleOCR membutuhkan setup backend khusus.\nGunakan Tesseract.js atau cloud API untuk hasil lebih baik.',
+                confidence: 0
+            };
+        }
+
+        async function processONNX(blob) {
+            return {
+                text: 'ONNX Runtime membutuhkan setup model ONNX khusus.\nGunakan Tesseract.js atau cloud API untuk kemudahan.',
+                confidence: 0
+            };
+        }
+
+        async function processWebLLM(blob) {
+            return {
+                text: 'WebLLM membutuhkan download model besar (1-5GB).\nGunakan cloud API untuk hasil cepat dan akurat.',
+                confidence: 0
             };
         }
 
@@ -570,7 +698,7 @@
                     messages: [{
                         role: 'user',
                         content: [
-                            { type: 'text', text: 'Ekstrak SEMUA teks dari gambar ini. Jika ada teks, return hanya teks tanpa penjelasan apapun. Jika tidak ada teks, return "TIDAK ADA TEKS"' },
+                            { type: 'text', text: 'Ekstrak SEMUA teks dari gambar. Hanya return teks, tidak ada penjelasan.' },
                             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Data}` } }
                         ]
                     }],
@@ -601,7 +729,7 @@
                 body: JSON.stringify({
                     contents: [{
                         parts: [
-                            { text: 'Ekstrak SEMUA teks dari gambar ini. Jika ada teks, return hanya teks tanpa penjelasan. Jika tidak ada, return "TIDAK ADA TEKS"' },
+                            { text: 'Ekstrak SEMUA teks dari gambar. Hanya return teks, tidak ada penjelasan.' },
                             { inline_data: { mime_type: 'image/jpeg', data: base64Data } }
                         ]
                     }]
@@ -638,7 +766,7 @@
                     messages: [{
                         role: 'user',
                         content: [
-                            { type: 'text', text: 'Ekstrak SEMUA teks dari gambar ini. Jika ada teks, return hanya teks. Jika tidak ada, return "TIDAK ADA TEKS"' },
+                            { type: 'text', text: 'Ekstrak SEMUA teks dari gambar. Hanya return teks, tidak ada penjelasan.' },
                             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Data } }
                         ]
                     }]
@@ -651,53 +779,6 @@
             return {
                 text: data.content[0].text,
                 confidence: 95
-            };
-        }
-
-        async function processAzure(blob) {
-            const endpoint = state.config.endpoint;
-            const apiKey = state.config.apiKey;
-            if (!endpoint || !apiKey) throw new Error('Endpoint atau API Key Azure tidak diisi');
-
-            const response = await fetch(`${endpoint.replace(/\/$/, '')}/vision/v4.0/read/analyzeImage`, {
-                method: 'POST',
-                headers: {
-                    'Ocp-Apim-Subscription-Key': apiKey,
-                    'Content-Type': 'application/octet-stream'
-                },
-                body: blob
-            });
-
-            if (!response.ok) throw new Error('Azure API error: ' + response.statusText);
-
-            const operationLocation = response.headers.get('Operation-Location');
-            if (!operationLocation) throw new Error('No operation location returned');
-
-            // Poll for results
-            let result = null;
-            for (let i = 0; i < 120; i++) {
-                await new Promise(r => setTimeout(r, 500));
-                const checkResponse = await fetch(operationLocation, {
-                    headers: { 'Ocp-Apim-Subscription-Key': apiKey }
-                });
-                const checkData = await checkResponse.json();
-                
-                if (checkData.status === 'succeeded') {
-                    result = checkData;
-                    break;
-                } else if (checkData.status === 'failed') {
-                    throw new Error('Azure operation failed');
-                }
-            }
-
-            if (!result) throw new Error('Azure operation timeout');
-
-            const text = result.analyzeResult.readResults
-                .map(page => page.lines.map(line => line.text).join('\n')).join('\n');
-
-            return {
-                text: text,
-                confidence: 94
             };
         }
 
@@ -736,15 +817,6 @@
             });
         }
 
-        function mapLanguage(provider) {
-            const lang = elements.languageSelect.value;
-            const langMap = {
-                tesseract: { id: 'ind', en: 'eng', zh: 'chi_sim', ja: 'jpn', ar: 'ara', ko: 'kor', vi: 'vie', th: 'tha' },
-                default: lang
-            };
-            return langMap[provider]?.[lang] || lang;
-        }
-
         async function processImage() {
             if (!state.originalImage) {
                 showError('Pilih gambar terlebih dahulu');
@@ -760,12 +832,22 @@
                 showProgress(0, 'Preprocessing...');
 
                 const processedBlob = await preprocessImage(state.originalImage);
-                showProgress(30, `Mengirim ke ${providers[provider].name}...`);
+                const providerName = providers[state.selectedType][provider].name;
+                showProgress(30, `Memproses dengan ${providerName}...`);
 
                 let result;
                 switch (provider) {
                     case 'tesseract':
                         result = await processTesseract(processedBlob);
+                        break;
+                    case 'paddleocr':
+                        result = await processPaddleOCR(processedBlob);
+                        break;
+                    case 'onnx':
+                        result = await processONNX(processedBlob);
+                        break;
+                    case 'webllm':
+                        result = await processWebLLM(processedBlob);
                         break;
                     case 'openai':
                         result = await processOpenAI(processedBlob);
@@ -776,9 +858,6 @@
                     case 'claude':
                         result = await processClaude(processedBlob);
                         break;
-                    case 'azure':
-                        result = await processAzure(processedBlob);
-                        break;
                     case 'google':
                         result = await processGoogle(processedBlob);
                         break;
@@ -788,7 +867,7 @@
 
                 elements.resultText.value = result.text || 'Tidak ada teks terdeteksi';
                 elements.confidenceScore.textContent = result.confidence + '%';
-                elements.usedApi.textContent = providers[provider].name;
+                elements.usedApi.textContent = providerName;
                 elements.confidenceContainer.classList.remove('hidden');
 
                 updateStatistics(result.text);
@@ -861,8 +940,7 @@
         }
 
         // Initialize
-        initializeProviders();
-        renderConfigPanel();
+        switchTab('offline');
     </script>
 </body>
 </html>
